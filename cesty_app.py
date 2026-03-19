@@ -27,7 +27,7 @@ with st.sidebar:
     st.header("Nastavení jízdy")
     
     # VÝBĚR AUTA
-    auto = st.selectbox("Vyber auto:", ["Dodávka 1 (Bílá)", "Dodávka 2 (Modrá)"])
+    auto = st.selectbox("Vyber auto:", ["Auto Ondra", "Auto Jonáš"])
     
     datum = st.date_input("Datum", datetime.now())
     celkova_cena = st.number_input("Celková cena (Kč)", min_value=0, value=2500)
