@@ -9,7 +9,6 @@ st.title("🚐 Evidence s uložením do Google Sheets")
 
 # Propojení s tabulkou
 conn = st.connection("gsheets", type=GSheetsConnection)
-
 # Vstupy
 with st.sidebar:
     st.header("Nová jízda")
