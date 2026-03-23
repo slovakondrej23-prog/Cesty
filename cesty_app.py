@@ -16,7 +16,7 @@ def nacti_data():
         return pd.DataFrame(columns=["Datum", "Auto", "Celkova_Cena", "Pocet_Lidi", "Cena_na_osobu", "Jmena"])
 
 # --- SEZNAM LIDÍ (Můžete si upravit) ---
-SEZNAM_LIDI = ["Petr", "Pavel", "Honza", "Lucka", "Marek", "Jana"]
+SEZNAM_LIDI = ["Ondra", "Jonáš", "Vojta", "Míček", "Pinďa", "Kevin","Verča","Marie"]
 
 st.title("🚐 Evidence jízd (Trvalá)")
 
