@@ -23,7 +23,7 @@ st.title("🚐 Evidence jízd (Trvalá)")
 # --- BOČNÍ PANEL ---
 with st.sidebar:
     st.header("Nová jízda")
-    auto = st.selectbox("Auto:", ["Dodávka 1", "Dodávka 2"])
+    auto = st.selectbox("Auto:", ["Auto Ondra", "Auto Jonáš"])
     datum = st.date_input("Datum:", datetime.now())
     cena_celkem = st.number_input("Cena celkem (Kč):", min_value=0, value=2500)
     
