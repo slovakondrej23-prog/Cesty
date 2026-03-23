@@ -45,7 +45,7 @@ with st.sidebar:
 # --- FORMULÁŘ JÍZDY ---
 st.subheader("📍 Nová jízda")
 col1, col2, col3 = st.columns(3)
-with col1: auto = st.selectbox("Auto:", ["Dodávka 1", "Dodávka 2"])
+with col1: auto = st.selectbox("Auto:", ["Auto Ondra", "Auto Jonáš"])
 with col2: datum = st.date_input("Datum:", datetime.now())
 with col3: celkova_cena = st.number_input("Cena (Kč):", min_value=0, value=2500)
 
