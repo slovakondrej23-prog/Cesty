@@ -8,13 +8,13 @@ st.set_page_config(page_title="Evidence jizd", page_icon="🚐")
 DATA_FILE = "historie_jizd.csv"
 PEOPLE_FILE = "seznam_lidi.txt"
 
-# --- FUNKCE PRO NAČÍTÁNÍ ---
+# --- NAČÍTÁNÍ ---
 def nacti_data():
     columns = ["Datum", "Auto", "Celkova_Cena", "Pocet_Lidi", "Cena_na_osobu", "Jmena"]
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE)
-            if "Auto" not in df.columns: df.insert(1, "Auto", "Neznámé")
+            df['Datum'] = pd.to_datetime(df['Datum']).dt.date
             return df
         except: return pd.DataFrame(columns=columns)
     return pd.DataFrame(columns=columns)
@@ -23,77 +23,85 @@ def nacti_lidi():
     if os.path.exists(PEOPLE_FILE):
         with open(PEOPLE_FILE, "r", encoding="utf-8") as f:
             return [line.strip() for line in f.readlines() if line.strip()]
-    return ["Petr", "Pavel", "Jana"] # Výchozí seznam, pokud soubor neexistuje
+    return ["Petr", "Pavel"]
 
-st.title("🚐 Evidence jízd dodávkou")
+st.title("🚐 Evidence s výběrem vyúčtování")
 
-# --- BOČNÍ PANEL ---
+# --- BOČNÍ PANEL (Zůstává stejný) ---
 with st.sidebar:
-    st.header("👥 Správa posádky")
-    stávající_lidi = nacti_lidi()
-    novy_seznam = st.text_area("Seznam lidí (každý na nový řádek):", value="\n".join(stávající_lidi))
-    if st.button("💾 Uložit seznam lidí"):
-        with open(PEOPLE_FILE, "w", encoding="utf-8") as f:
-            f.write(novy_seznam)
-        st.success("Seznam aktualizován!")
+    st.header("👥 Posádka")
+    lidi = nacti_lidi()
+    novy_seznam = st.text_area("Seznam lidí:", value="\n".join(lidi))
+    if st.button("💾 Uložit lidi"):
+        with open(PEOPLE_FILE, "w", encoding="utf-8") as f: f.write(novy_seznam)
         st.rerun()
-
     st.divider()
-    st.header("🛠️ Správa historie")
-    df = nacti_data()
-    if not df.empty:
-        if st.button("⬅️ Smazat poslední jízdu"):
+    if st.button("⬅️ Smazat poslední jízdu"):
+        df = nacti_data()
+        if not df.empty:
             df.drop(df.index[-1]).to_csv(DATA_FILE, index=False)
             st.rerun()
 
-# --- HLAVNÍ FORMULÁŘ ---
+# --- FORMULÁŘ JÍZDY ---
 st.subheader("📍 Nová jízda")
-col1, col2 = st.columns(2)
-with col1:
-    auto = st.selectbox("Auto:", ["Auto Ondra", "Auto Jonáš"])
-    datum = st.date_input("Datum:", datetime.now())
-with col2:
-    celkova_cena = st.number_input("Celková cena (Kč):", min_value=0, value=2500)
+col1, col2, col3 = st.columns(3)
+with col1: auto = st.selectbox("Auto:", ["Dodávka 1", "Dodávka 2"])
+with col2: datum = st.date_input("Datum:", datetime.now())
+with col3: celkova_cena = st.number_input("Cena (Kč):", min_value=0, value=2500)
 
-st.write("**Kdo jel? (zaškrtni):**")
-seznam_pro_vyber = nacti_lidi()
-# Vytvoření mřížky pro zaškrtávátka (3 sloupce)
-cols = st.columns(3)
-vybrani_lidi = []
-for i, clovek in enumerate(seznam_pro_vyber):
-    with cols[i % 3]:
-        if st.checkbox(clovek, key=f"ch_{clovek}"):
-            vybrani_lidi.append(clovek)
+vybrani_lidi = [c for c in lidi if st.sidebar.checkbox(c, key=f"n_{c}")] # Přesunuto do sidebar pro místo
 
 if vybrani_lidi:
-    pocet = len(vybrani_lidi)
-    cena_osoba = round(celkova_cena / pocet, 2)
-    st.info(f"Jedou {pocet} lidé. Cena na osobu: **{cena_osoba} Kč**")
-    
+    cena_osoba = round(celkova_cena / len(vybrani_lidi), 2)
+    st.info(f"Cena: **{cena_osoba} Kč/osoba**")
     if st.button("✅ ULOŽIT JÍZDU"):
-        df_new = pd.concat([nacti_data(), pd.DataFrame([{
-            "Datum": str(datum), "Auto": auto, "Celkova_Cena": celkova_cena, 
-            "Pocet_Lidi": pocet, "Cena_na_osobu": cena_osoba, "Jmena": ", ".join(vybrani_lidi)
-        }])], ignore_index=True)
+        df_new = pd.concat([nacti_data(), pd.DataFrame([{"Datum": datum, "Auto": auto, "Celkova_Cena": celkova_cena, "Pocet_Lidi": len(vybrani_lidi), "Cena_na_osobu": cena_osoba, "Jmena": ", ".join(vybrani_lidi)}])], ignore_index=True)
         df_new.to_csv(DATA_FILE, index=False)
-        st.success("Jízda uložena!")
-        st.balloons()
+        st.success("Uloženo!")
         st.rerun()
-else:
-    st.warning("Vyberte alespoň jednoho pasažéra.")
 
-# --- HISTORIE A VYÚČTOVÁNÍ ---
+# --- HISTORIE A FILTROVANÉ VYÚČTOVÁNÍ ---
 st.divider()
 historie = nacti_data()
+
 if not historie.empty:
-    tab1, tab2 = st.tabs(["📋 Seznam jízd", "💰 Vyúčtování"])
+    tab1, tab2 = st.tabs(["📋 Všechny jízdy", "💰 Výběrové vyúčtování"])
+    
     with tab1:
         st.dataframe(historie, use_container_width=True)
+    
     with tab2:
-        seznam_dluhu = []
-        for _, radek in historie.iterrows():
-            for clovek in str(radek["Jmena"]).split(", "):
-                if clovek: seznam_dluhu.append({"Jméno": clovek, "Částka": radek["Cena_na_osobu"]})
-        if seznam_dluhu:
+        st.subheader("Vyber jízdy k proplacení")
+        
+        # 1. Filtr podle data
+        col_f1, col_f2 = st.columns(2)
+        with col_f1: d_od = st.date_input("Od:", historie['Datum'].min())
+        with col_f2: d_do = st.date_input("Do:", historie['Datum'].max())
+        
+        # 2. Zobrazení tabulky s možností výběru řádků
+        mask = (historie['Datum'] >= d_od) & (historie['Datum'] <= d_do)
+        data_k_vyberu = historie.loc[mask].copy()
+        
+        # Přidáme sloupec pro zaškrtnutí přímo v tabulce
+        data_k_vyberu.insert(0, "Vybrat", True)
+        upravena_tabulka = st.data_editor(
+            data_k_vyberu,
+            column_config={"Vybrat": st.column_config.CheckboxColumn(default=True)},
+            disabled=["Datum", "Auto", "Celkova_Cena", "Pocet_Lidi", "Cena_na_osobu", "Jmena"],
+            hide_index=True,
+        )
+        
+        # 3. Výpočet jen z vybraných řádků
+        vybrane_jizdy = upravena_tabulka[upravena_tabulka["Vybrat"] == True]
+        
+        if not vybrane_jizdy.empty:
+            seznam_dluhu = []
+            for _, radek in vybrane_jizdy.iterrows():
+                for clovek in str(radek["Jmena"]).split(", "):
+                    if clovek: seznam_dluhu.append({"Jméno": clovek, "Částka": radek["Cena_na_osobu"]})
+            
+            st.write("### Celkem k zaplacení za vybrané období:")
             souhrn = pd.DataFrame(seznam_dluhu).groupby("Jméno")["Částka"].sum().reset_index()
             st.table(souhrn.sort_values(by="Částka", ascending=False).style.format({"Částka": "{:.2f} Kč"}))
+        else:
+            st.warning("Žádné jízdy nejsou vybrány.")
