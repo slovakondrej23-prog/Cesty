@@ -50,7 +50,7 @@ with st.sidebar:
 st.subheader("📍 Nová jízda")
 col1, col2 = st.columns(2)
 with col1:
-    auto = st.selectbox("Auto:", ["Dodávka 1", "Dodávka 2"])
+    auto = st.selectbox("Auto:", ["Auto Ondra", "Auto Jonáš"])
     datum = st.date_input("Datum:", datetime.now())
 with col2:
     celkova_cena = st.number_input("Celková cena (Kč):", min_value=0, value=2500)
