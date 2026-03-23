@@ -12,7 +12,6 @@ def nacti_data():
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE)
-            # Pokud v souboru chybí sloupec Auto (ze starších verzí), přidáme ho
             if "Auto" not in df.columns:
                 df.insert(1, "Auto", "Neznámé")
             return df
@@ -24,68 +23,61 @@ st.title("🚐 Evidence jízd dodávkou")
 
 # --- BOČNÍ PANEL ---
 with st.sidebar:
-    st.header("Nastavení jízdy")
-    
-    # VÝBĚR AUTA
-    auto = st.selectbox("Vyber auto:", ["Auto Ondra", "Auto Jonáš"])
-    
+    st.header("Nová jízda")
+    auto = st.selectbox("Vyber auto:", ["Dodávka 1", "Dodávka 2"]) # Tady si upravte názvy
     datum = st.date_input("Datum", datetime.now())
     celkova_cena = st.number_input("Celková cena (Kč)", min_value=0, value=2500)
     jmena_vstup = st.text_area("Jména (oddělená čárkou)")
     
     st.divider()
-    st.header("🛠️ Správa historie")
+    st.header("🛠️ Správa")
     df = nacti_data()
-    
     if not df.empty:
         if st.button("⬅️ Smazat poslední jízdu"):
-            df = df.drop(df.index[-1])
-            df.to_csv(DATA_FILE, index=False)
-            st.warning("Poslední jízda smazána.")
-            st.rerun()
-            
-        index_ke_smazani = st.number_input("Smazat jízdu č.:", min_value=0, max_value=len(df)-1, step=1)
-        if st.button("🗑️ Smazat vybranou"):
-            df = df.drop(df.index[index_ke_smazani])
-            df.to_csv(DATA_FILE, index=False)
+            df.drop(df.index[-1]).to_csv(DATA_FILE, index=False)
             st.rerun()
 
-# --- VÝPOČET ---
+# --- VÝPOČET A ULOŽENÍ ---
 pasazeri = [p.strip() for p in jmena_vstup.replace('\n', ',').split(',') if p.strip()]
-
 if pasazeri:
-    pocet = len(pasazeri)
-    cena_osoba = round(celkova_cena / pocet, 2)
-    st.metric(f"Cena na osobu ({auto})", f"{cena_osoba} Kč")
-    
+    cena_osoba = round(celkova_cena / len(pasazeri), 2)
+    st.metric(f"Cena na osobu", f"{cena_osoba} Kč")
     if st.button("✅ Uložit do historie"):
-        df_aktualni = nacti_data()
-        novy_radek = pd.DataFrame([{
-            "Datum": str(datum),
-            "Auto": auto,
-            "Celkova_Cena": celkova_cena,
-            "Pocet_Lidi": pocet,
-            "Cena_na_osobu": cena_osoba,
-            "Jmena": ", ".join(pasazeri)
-        }])
-        df_aktualni = pd.concat([df_aktualni, novy_radek], ignore_index=True)
-        df_aktualni.to_csv(DATA_FILE, index=False)
-        st.success(f"Uloženo pro {auto}!")
+        df_new = pd.concat([nacti_data(), pd.DataFrame([{"Datum": str(datum), "Auto": auto, "Celkova_Cena": celkova_cena, "Pocet_Lidi": len(pasazeri), "Cena_na_osobu": cena_osoba, "Jmena": ", ".join(pasazeri)}])], ignore_index=True)
+        df_new.to_csv(DATA_FILE, index=False)
+        st.success("Uloženo!")
         st.rerun()
 
-# --- FILTR A TABULKA ---
+# --- HISTORIE A VYÚČTOVÁNÍ ---
 st.divider()
-st.subheader("📜 Historie jízd")
 historie = nacti_data()
 
 if not historie.empty:
-    # FILTR V TABULCE
-    filtr_auto = st.multiselect("Zobrazit jen auta:", options=historie["Auto"].unique(), default=historie["Auto"].unique())
-    zobrazena_data = historie[historie["Auto"].isin(filtr_auto)]
+    tab1, tab2 = st.tabs(["📋 Seznam jízd", "💰 Vyúčtování osob"])
     
-    st.dataframe(zobrazena_data, use_container_width=True)
+    with tab1:
+        filtr_auto = st.multiselect("Filtr aut:", options=historie["Auto"].unique(), default=historie["Auto"].unique())
+        st.dataframe(historie[historie["Auto"].isin(filtr_auto)], use_container_width=True)
     
-    csv = zobrazena_data.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 Stáhnout tento výběr (CSV)", data=csv, file_name="export_jizd.csv")
+    with tab2:
+        st.subheader("Celkové částky podle jmen")
+        # Výpočet sumy pro každého pasažéra
+        seznam_dluhu = []
+        for _, radek in historie.iterrows():
+            lidi_v_jizde = [j.strip() for j in str(radek["Jmena"]).split(",")]
+            for clovek in lidi_v_jizde:
+                if clovek:
+                    seznam_dluhu.append({"Jméno": clovek, "Částka": radek["Cena_na_osobu"]})
+        
+        if seznam_dluhu:
+            df_dluhy = pd.DataFrame(seznam_dluhu)
+            souhrn = df_dluhy.groupby("Jméno")["Částka"].sum().reset_index()
+            souhrn = souhrn.sort_values(by="Částka", ascending=False)
+            
+            # Zobrazení výsledků
+            st.table(souhrn.style.format({"Částka": "{:.2f} Kč"}))
+            st.info("💡 Tip: Toto jsou celkové sumy za všechna auta a všechna data v historii.")
+        else:
+            st.write("Zatím žádná data.")
 else:
-    st.info("Zatím žádné jízdy.")
+    st.info("Zatím žádné jízdy k zobrazení.")
